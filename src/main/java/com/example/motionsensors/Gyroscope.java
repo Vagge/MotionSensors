@@ -10,7 +10,7 @@ public class Gyroscope {
 
 
     public interface Listener {
-        void onRotation (float rx, float ry, float rz);
+        void onRotation (float rx, float ry, float rz, long timestamp);
     }
 
     private Listener listener;
@@ -31,7 +31,7 @@ public class Gyroscope {
             @Override
             public void onSensorChanged(SensorEvent event) {
                 if (listener != null)
-                    listener.onRotation(event.values[0], event.values[1], event.values[2]);
+                    listener.onRotation(event.values[0], event.values[1], event.values[2], event.timestamp);
 
             }
 
@@ -43,7 +43,7 @@ public class Gyroscope {
     }
 
     public void register () {
-        sensorManager.registerListener(sensorEventListener, sensor, SensorManager.SENSOR_DELAY_NORMAL);
+        sensorManager.registerListener(sensorEventListener, sensor, SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
     }
 
     public void unregister () {
