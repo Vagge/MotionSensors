@@ -27,6 +27,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView gyroDegree;
     private Button toggelButton;
     private double oldV;
+    private double newV;
     private double CpitchOld;
     private boolean toggle;
     private double startTime;
@@ -36,7 +37,8 @@ public class MainActivity extends AppCompatActivity {
     private ArrayList<Long> timestampsMethodTwo;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState)
+    {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         accelerometer = new Accelerometer(this);
@@ -44,24 +46,24 @@ public class MainActivity extends AppCompatActivity {
         accDegree = findViewById(R.id.acc_degree);
         gyroDegree = findViewById(R.id.gyro_degree);
         toggelButton = findViewById(R.id.button);
-        toggle = true;
+        toggle = false;
         degreesMethodOne = new ArrayList<>();
         timestampsMethodOne = new ArrayList<>();
         degreesMethodTwo = new ArrayList<>();
         timestampsMethodTwo = new ArrayList<>();
-
+        setAccelerometerListener();
+        setGyroscopeListener();
         toggelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                startTime = System.currentTimeMillis();
-                if (toggle) {
-                    toggle = false;
-                    accelerometer.register();
-                    gyroscope.register();
-                    setAccelerometerListener();
-                    setGyroscopeListener();
+                if (!toggle) {
+                    toggle = true;
+                    startTime = System.currentTimeMillis();
+                    toggelButton.setText(R.string.on);
                 } else {
-                    unregister ();
+                    toggle = false;
+                    toggelButton.setText(R.string.off);
+                    WriteToFile();
                 }
             }
         });
@@ -75,16 +77,29 @@ public class MainActivity extends AppCompatActivity {
                 double y = (double) ty;
                 double z = (double) tz;
 
-                double newValue = Math.sqrt(Math.pow(z, 2) + Math.pow(x, 2));
-                if(newValue!=0)
+                newV= Math.sqrt(Math.pow(y, 2) + Math.pow(x, 2));
+                if(newV!=0)
                 {
-                    newValue = y / newValue;
-                    newValue = Math.atan(newValue);
-                    newValue = newValue * (180 / Math.PI);
-                    oldV = 0.1 * newValue + 0.9 * oldV;
-                    accDegree.setText(String.valueOf(oldV+90));
-                    degreesMethodOne.add(oldV+90);
-                    timestampsMethodOne.add(timestamp);
+                    newV = z / newV;
+                    newV = Math.atan(newV);
+                    newV = newV* (180 / Math.PI);
+                    oldV = 0.2 * newV + 0.8 * oldV;
+                    accDegree.setText(String.valueOf(oldV));
+
+
+                    if(toggle)
+                    {
+                        double time = System.currentTimeMillis() - startTime;
+                        if (time <= 10000)
+                        {
+                            degreesMethodOne.add(oldV);
+                            timestampsMethodOne.add(timestamp);
+                        }
+                        else
+                        {
+                            WriteToFile();
+                        }
+                    }
                 }
             }
         });
@@ -95,16 +110,24 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onRotation(float rx, float ry, float rz, long timestamp) {
                 double alfa = 0.1;
-                double pitch = oldV;
                 double dT = 1 / 52;
-                double Cpitch = alfa * (CpitchOld + dT * rx) + (1 - alfa) * pitch;
+                double Cpitch = alfa * (CpitchOld + dT * rz) + (1 - alfa) * newV;
                 CpitchOld = Cpitch;
-                gyroDegree.setText(String.valueOf(Cpitch+90));
-                degreesMethodTwo.add(Cpitch+90);
-                timestampsMethodTwo.add(timestamp);
-
-                if (System.currentTimeMillis() - startTime >= 10000) {
-                    unregister ();
+                gyroDegree.setText(String.valueOf(Cpitch));
+                if(toggle)
+                {
+                    double time = System.currentTimeMillis() - startTime;
+                    if (time <= 10000)
+                    {
+                        degreesMethodTwo.add(Cpitch);
+                        timestampsMethodTwo.add(timestamp);
+                    }
+                    else
+                    {
+                        toggle = false;
+                        toggelButton.setText(R.string.off);
+                        WriteToFile();
+                    }
                 }
             }
         });
@@ -123,20 +146,29 @@ public class MainActivity extends AppCompatActivity {
 
     public void WriteToFile() {
         PrintWriter writer = null;
+        PrintWriter writer2 = null;
         try {
             OutputStream os = this.openFileOutput(
                     "data.txt", Context.MODE_PRIVATE);
             writer = new PrintWriter(os);
             for(int i = 0; i < timestampsMethodOne.size(); i++)
             {
-                writer.println(timestampsMethodOne.get(i) + " " + degreesMethodOne.get(i));
+                writer.println(timestampsMethodOne.get(i));
             }
-
+            for(int i = 0; i < degreesMethodOne.size(); i++)
+            {
+                writer.println(degreesMethodOne.get(i));
+            }
             OutputStream os2 = this.openFileOutput(
                     "data2.txt", Context.MODE_PRIVATE);
+            writer2 = new PrintWriter(os2);
             for(int i = 0; i < timestampsMethodTwo.size(); i++)
             {
-                writer.println(timestampsMethodTwo.get(i) + " " + degreesMethodTwo.get(i));
+                writer2.println(timestampsMethodTwo.get(i));
+            }
+            for(int i = 0; i < degreesMethodTwo.size(); i++)
+            {
+                writer2.println(degreesMethodTwo.get(i));
             }
             Toast.makeText(getBaseContext(), "File saved successfully!", Toast.LENGTH_SHORT).show();
         }
@@ -145,12 +177,15 @@ public class MainActivity extends AppCompatActivity {
         }
         finally {
             if(writer != null) writer.close();
+            if(writer2 != null) writer2.close();
         }
     }
 
+
+
     @Override
-    protected void onResume() {
-        super.onResume();
+    protected void onStart() {
+        super.onStart();
         accelerometer.register();
         gyroscope.register();
     }
